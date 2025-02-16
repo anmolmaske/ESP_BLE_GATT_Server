@@ -20,6 +20,26 @@
 
 #define TAG "MAIN" // Logging tag for debugging
 
+
+// Function to get and print BLE MAC Address
+void print_ble_mac_address(void) {
+    const uint8_t *ble_mac = esp_bt_dev_get_address();
+    
+    if (ble_mac) {
+        char ble_mac_str[18];  // "XX:XX:XX:XX:XX:XX" + null terminator
+
+        // Format MAC address into a string
+        snprintf(ble_mac_str, sizeof(ble_mac_str), "%02X:%02X:%02X:%02X:%02X:%02X",
+                 ble_mac[0], ble_mac[1], ble_mac[2], ble_mac[3], ble_mac[4], ble_mac[5]);
+
+        // Print the MAC address
+        ESP_LOGI(TAG, "ESP32 BLE MAC Address: %s\n", ble_mac_str);
+    } else {
+        ESP_LOGI(TAG, "Failed to retrieve BLE MAC Address\n");
+    }
+}
+
+
 void app_main(void) {
     esp_err_t ret;
 
@@ -62,6 +82,9 @@ void app_main(void) {
         ESP_LOGE(TAG, "%s enable bluetooth failed: %s", __func__, esp_err_to_name(ret));
         return;
     }
+
+    // Get the BLE MAC Address
+    print_ble_mac_address();
 
     // Initialize the GATT server
     gatt_server_init();
