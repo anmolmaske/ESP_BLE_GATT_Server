@@ -39,6 +39,19 @@ void print_ble_mac_address(void) {
     }
 }
 
+// Function to set BLE TX power
+void set_ble_tx_power(esp_power_level_t power_level) {
+
+    /* Broadcast the advertising Packet depending upon power level */
+    esp_err_t ret = esp_ble_tx_power_set(ESP_BLE_PWR_TYPE_ADV, power_level);
+    
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "BLE TX Power set to level %d\n", power_level);
+    } else {
+        ESP_LOGI(TAG, "Failed to set BLE TX Power: %s\n", esp_err_to_name(ret));
+    }
+}
+
 
 void app_main(void) {
     esp_err_t ret;
@@ -85,6 +98,9 @@ void app_main(void) {
 
     // Get the BLE MAC Address
     print_ble_mac_address();
+
+    // Set BLE TX Power to Maximum (+9 dBm)
+    set_ble_tx_power(ESP_PWR_LVL_P9);
 
     // Initialize the GATT server
     gatt_server_init();
