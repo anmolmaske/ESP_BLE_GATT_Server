@@ -13,55 +13,6 @@
 
 #define GATTS_TAG "GATT_SERVER"
 
-/* One GATT-based profile per app_id and gatts_if. 
- * This array stores the gatts_if returned by ESP_GATTS_REG_EVT.
- */
-struct gatts_profile_inst gl_profile_tab[PROFILE_NUM] = {
-    [PROFILE_A_APP_ID] = {
-        .gatts_cb = profile_a_event_handler,  // Callback function for Profile A events
-        .gatts_if = ESP_GATT_IF_NONE,         // Initially set to ESP_GATT_IF_NONE (not yet assigned)
-    },
-    [PROFILE_B_APP_ID] = {
-        .gatts_cb = profile_b_event_handler,  // Callback function for Profile B events
-        .gatts_if = ESP_GATT_IF_NONE,         // Initially set to ESP_GATT_IF_NONE (not yet assigned)
-    },
-};
-
-/* Event handler for GATT server events */
-static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param) {
-    if (event == ESP_GATTS_REG_EVT) {
-        if (param->reg.status == ESP_GATT_OK) {
-            // Store the gatts_if for the corresponding application ID
-            gl_profile_tab[param->reg.app_id].gatts_if = gatts_if;
-        } else {
-            ESP_LOGE(GATTS_TAG, "Reg app failed, app_id %04x, status %d", param->reg.app_id, param->reg.status);
-            return;
-        }
-    }
-
-    /* If gatts_if is ESP_GATT_IF_NONE, call all profile callbacks.
-     * Otherwise, call the specific profile callback.
-     */
-    do {
-        int idx;
-        for (idx = 0; idx < PROFILE_NUM; idx++) {
-            if (gatts_if == ESP_GATT_IF_NONE ||  // Call all profiles if not specific
-                gatts_if == gl_profile_tab[idx].gatts_if) {
-                if (gl_profile_tab[idx].gatts_cb) {
-                    gl_profile_tab[idx].gatts_cb(event, gatts_if, param);
-                }
-            }
-        }
-    } while (0);
-}
-
-/* Initializes the GATT server */
-void gatt_server_init(void) {
-    esp_ble_gatts_register_callback(gatts_event_handler);  // Register the main event handler
-    esp_ble_gatts_app_register(PROFILE_A_APP_ID);          // Register Profile A
-    esp_ble_gatts_app_register(PROFILE_B_APP_ID);          // Register Profile B
-    esp_ble_gatt_set_local_mtu(500);                       // Set the MTU size to 500 bytes
-}
 
 /* Handles write events for characteristics with prepare write enabled */
 void example_write_event_env(esp_gatt_if_t gatts_if, prepare_type_env_t *prepare_write_env, esp_ble_gatts_cb_param_t *param){
@@ -138,4 +89,83 @@ void example_exec_write_event_env(prepare_type_env_t *prepare_write_env, esp_ble
         prepare_write_env->prepare_buf = NULL;
     }
     prepare_write_env->prepare_len = 0;
+}
+
+
+/* One GATT-based profile per app_id and gatts_if. 
+ * This array stores the gatts_if returned by ESP_GATTS_REG_EVT.
+ */
+struct gatts_profile_inst gl_profile_tab[PROFILE_NUM] = {
+    [PROFILE_A_APP_ID] = {
+        .gatts_cb = profile_a_event_handler,  // Callback function for Profile A events
+        .gatts_if = ESP_GATT_IF_NONE,         // Initially set to ESP_GATT_IF_NONE (not yet assigned)
+    },
+    [PROFILE_B_APP_ID] = {
+        .gatts_cb = profile_b_event_handler,  // Callback function for Profile B events
+        .gatts_if = ESP_GATT_IF_NONE,         // Initially set to ESP_GATT_IF_NONE (not yet assigned)
+    },
+};
+
+
+/* Event handler for GATT server events */
+static void gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param) {
+    if (event == ESP_GATTS_REG_EVT) {
+        if (param->reg.status == ESP_GATT_OK) {
+            // Store the gatts_if for the corresponding application ID
+            gl_profile_tab[param->reg.app_id].gatts_if = gatts_if;
+        } else {
+            ESP_LOGE(GATTS_TAG, "Reg app failed, app_id %04x, status %d", param->reg.app_id, param->reg.status);
+            return;
+        }
+    }
+
+    /* If gatts_if is ESP_GATT_IF_NONE, call all profile callbacks.
+     * Otherwise, call the specific profile callback.
+     */
+    do {
+        int idx;
+        for (idx = 0; idx < PROFILE_NUM; idx++) {
+            if (gatts_if == ESP_GATT_IF_NONE ||  // Call all profiles if not specific
+                gatts_if == gl_profile_tab[idx].gatts_if) {
+                if (gl_profile_tab[idx].gatts_cb) {
+                    gl_profile_tab[idx].gatts_cb(event, gatts_if, param);
+                }
+            }
+        }
+    } while (0);
+}
+
+/* Initializes the GATT server */
+void gatt_server_init(void) {
+
+    esp_err_t ret;
+
+    /* Register the main event handler */
+    ret = esp_ble_gatts_register_callback(gatts_event_handler);
+    if (ret){
+        ESP_LOGE(GATTS_TAG, "gatts register error, error code = %x", ret);
+        return;
+    }
+
+    /* Register Profile A */
+    ret = esp_ble_gatts_app_register(PROFILE_A_APP_ID);
+    if (ret){
+        ESP_LOGE(GATTS_TAG, "gatts app register error, error code = %x", ret);
+        return;
+    }
+
+    /* Register Profile B */
+    ret = esp_ble_gatts_app_register(PROFILE_B_APP_ID);
+    if (ret){
+        ESP_LOGE(GATTS_TAG, "gatts app register error, error code = %x", ret);
+        return;
+    }
+
+    /* Set the MTU size to 500 bytes */
+    esp_err_t local_mtu_ret = esp_ble_gatt_set_local_mtu(500);
+    if (local_mtu_ret){
+        ESP_LOGE(GATTS_TAG, "set local  MTU failed, error code = %x", local_mtu_ret);
+    }
+
+    return;
 }

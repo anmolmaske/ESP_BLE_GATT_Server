@@ -1,47 +1,71 @@
-#include "nvs_flash.h"
-#include "esp_bt.h"
-#include "esp_bt_main.h"
-#include "gap.h"
-#include "gatt_server.h"
-
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
-#include "esp_system.h"
-#include "esp_log.h"
-#include "nvs_flash.h"
-#include "esp_bt.h"
 
-#include "esp_gap_ble_api.h"
-#include "esp_gatts_api.h"
+#include "esp_system.h"
+#include "esp_bt.h"
 #include "esp_bt_defs.h"
 #include "esp_bt_main.h"
 #include "esp_bt_device.h"
+
+#include "esp_gap_ble_api.h"
+#include "esp_gatts_api.h"
 #include "esp_gatt_common_api.h"
 
+#include "nvs_flash.h"
+#include "esp_log.h"
+
+#include "gap.h"
+#include "gatt_server.h"
+
+#define TAG "MAIN" // Logging tag for debugging
 
 void app_main(void) {
     esp_err_t ret;
 
-    // Initialize NVS
+    // Initialize Non-Volatile Storage (NVS)
     ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ret = nvs_flash_init();
+        ESP_ERROR_CHECK(nvs_flash_erase()); // Erase NVS if required
+        ret = nvs_flash_init(); // Reinitialize NVS
     }
-    ESP_ERROR_CHECK(ret);
+    ESP_ERROR_CHECK(ret); // Check for errors
 
-    // Initialize Bluetooth controller
+    // Release memory allocated for Classic Bluetooth since we only use BLE
     ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT));
+
+    // Configure and initialize the Bluetooth controller
     esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_bt_controller_init(&bt_cfg));
-    ESP_ERROR_CHECK(esp_bt_controller_enable(ESP_BT_MODE_BLE));
+    ret = esp_bt_controller_init(&bt_cfg);
+    if (ret) {
+        ESP_LOGE(TAG, "%s initialize controller failed: %s", __func__, esp_err_to_name(ret));
+        return;
+    }
 
-    // Initialize Bluedroid stack
-    ESP_ERROR_CHECK(esp_bluedroid_init());
-    ESP_ERROR_CHECK(esp_bluedroid_enable());
+    // Enable the Bluetooth controller in BLE mode
+    ret = esp_bt_controller_enable(ESP_BT_MODE_BLE);
+    if (ret) {
+        ESP_LOGE(TAG, "%s enable controller failed: %s", __func__, esp_err_to_name(ret));
+        return;
+    }
 
-    // Initialize GAP and GATT Server
-    gap_init();
+    // Initialize the Bluedroid Bluetooth stack
+    ret = esp_bluedroid_init();
+    if (ret) {
+        ESP_LOGE(TAG, "%s init bluetooth failed: %s", __func__, esp_err_to_name(ret));
+        return;
+    }
+
+    // Enable Bluedroid
+    ret = esp_bluedroid_enable();
+    if (ret) {
+        ESP_LOGE(TAG, "%s enable bluetooth failed: %s", __func__, esp_err_to_name(ret));
+        return;
+    }
+
+    // Initialize the GATT server
     gatt_server_init();
+
+    // Initialize the GAP (Generic Access Profile) layer
+    gap_init();
 }
